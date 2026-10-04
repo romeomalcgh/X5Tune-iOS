@@ -1,0 +1,39 @@
+name: X5Tune
+
+options:
+  bundleIdPrefix: com.ximtune
+  deploymentTarget:
+    iOS: "18.0"
+
+targets:
+  X5Tune:
+    type: application
+    platform: iOS
+    sources:
+      - path: .
+        excludes:
+          - "*.md"
+          - "*.txt"
+          - ".github/**"
+          - "project.yml"
+          - "*.xcodeproj/**"
+    info:
+      path: Info.plist
+      properties:
+        CFBundleDisplayName: X5Tune
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+        NSBluetoothAlwaysUsageDescription: "X5Tune uses Bluetooth only to inspect the scooter BLE interface and read diagnostic data."
+        UILaunchScreen:
+          UIColorName: ""
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ximtune.readonly
+        SWIFT_VERSION: "6.0"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGNING_ALLOWED: NO
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGN_IDENTITY: ""
+        DEVELOPMENT_TEAM: ""
+    scheme:
+      gatherCoverageData: false

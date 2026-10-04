@@ -1,0 +1,2 @@
+<key>NSBluetoothAlwaysUsageDescription</key>
+<string>X5Tune uses Bluetooth only to inspect the scooter BLE interface and read diagnostic data.</string>
