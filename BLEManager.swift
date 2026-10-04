@@ -27,6 +27,27 @@ final class BLEManager: NSObject, ObservableObject {
         peripheral.delegate = self; central.connect(peripheral, options: nil)
     }
     func disconnect() { if let p = connectedPeripheral { central.cancelPeripheralConnection(p) } }
+    func setNotify(_ enabled: Bool, for uuid: String) {
+        guard let characteristic = characteristicMap[CBUUID(string: uuid)], let peripheral = connectedPeripheral else {
+            addLog("Notify \(uuid): unavailable (not connected or not discovered)")
+            return
+        }
+        guard characteristic.properties.contains(.notify) || characteristic.properties.contains(.indicate) else {
+            addLog("Notify \(uuid): unsupported")
+            return
+        }
+        addLog("\(enabled ? "Subscribing" : "Unsubscribing") \(uuid)…")
+        peripheral.setNotifyValue(enabled, for: characteristic)
+    }
+    func read(_ uuid: String) {
+        guard let characteristic = characteristicMap[CBUUID(string: uuid)], let peripheral = connectedPeripheral else {
+            addLog("Read \(uuid): unavailable (not connected or not discovered)")
+            return
+        }
+        guard characteristic.properties.contains(.read) else { addLog("Read \(uuid): unsupported"); return }
+        addLog("Reading \(uuid)…")
+        peripheral.readValue(for: characteristic)
+    }
     func exportSnapshot() -> BLESnapshot? {
         guard let p = connectedPeripheral else { return nil }
         let snapshot = BLESnapshot(createdAt: Date(), peripheralName: p.name ?? "Unnamed", peripheralIdentifier: p.identifier.uuidString, services: snapshots)
@@ -96,7 +117,6 @@ extension BLEManager: CBPeripheralDelegate {
                 self.characteristicMap[c.uuid]=c
                 self.addLog("GATT \(service.uuid) / \(c.uuid) [\(self.propertyString(c.properties))]")
                 if c.properties.contains(.read) { peripheral.readValue(for:c) }
-                if c.properties.contains(.notify) || c.properties.contains(.indicate) { peripheral.setNotifyValue(true, for:c) }
             }
             self.rebuildSnapshots()
         }

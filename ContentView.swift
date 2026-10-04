@@ -19,7 +19,20 @@ struct ContentView: View {
                 }
                 Section("GATT map") {
                     if ble.snapshots.isEmpty { Text("Connect to enumerate services and characteristics.").foregroundStyle(.secondary) }
-                    else { ForEach(ble.snapshots) { s in DisclosureGroup(s.uuid) { ForEach(s.characteristics) { c in VStack(alignment:.leading,spacing:3){ Text(c.uuid).font(.system(.body,design:.monospaced)); Text(c.properties).font(.caption).foregroundStyle(.secondary); if let v=c.valueHex{Text(v).font(.system(.caption,design:.monospaced))}; if let t=c.valueUTF8,!t.isEmpty{Text(t).font(.caption)} }.padding(.vertical,3) } } } }
+                    else { ForEach(ble.snapshots) { s in DisclosureGroup(s.uuid) { ForEach(s.characteristics) { c in
+                        VStack(alignment:.leading,spacing:7) {
+                            HStack { Text(c.uuid).font(.system(.body,design:.monospaced)); Spacer(); Text(c.isNotifying ? "NOTIFY ON" : "NOTIFY OFF").font(.caption2.bold()).foregroundStyle(c.isNotifying ? .green : .secondary) }
+                            Text(c.properties).font(.caption).foregroundStyle(.secondary)
+                            HStack(spacing:8) {
+                                if c.properties.contains("NOTIFY") || c.properties.contains("INDICATE") {
+                                    Button(c.isNotifying ? "Unsubscribe" : "Subscribe") { ble.setNotify(!c.isNotifying, for: c.uuid) }.buttonStyle(.bordered)
+                                }
+                                if c.properties.contains("READ") { Button("Read") { ble.read(c.uuid) }.buttonStyle(.bordered) }
+                            }
+                            if let v=c.valueHex { Text(v).font(.system(.caption,design:.monospaced)).textSelection(.enabled) }
+                            if let t=c.valueUTF8,!t.isEmpty { Text(t).font(.caption).textSelection(.enabled) }
+                        }.padding(.vertical,5)
+                    } } } }
                 }
                 Section("Snapshot") {
                     Button("Create BLE snapshot") {
