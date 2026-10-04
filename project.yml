@@ -1,4 +1,4 @@
-name: X5Tune
+﻿name: X5Tune
 
 options:
   bundleIdPrefix: com.ximtune
@@ -14,7 +14,11 @@ targets:
         excludes:
           - "*.md"
           - "*.txt"
+          - ".git/**"
           - ".github/**"
+          - "artifacts/**"
+          - "build/**"
+          - "ipa/**"
           - "project.yml"
           - "*.xcodeproj/**"
     info:
@@ -37,4 +41,3 @@ targets:
         DEVELOPMENT_TEAM: ""
     scheme:
       gatherCoverageData: false
-
