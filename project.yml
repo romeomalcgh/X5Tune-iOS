@@ -29,7 +29,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ximtune.readonly
-        SWIFT_VERSION: "6.0"
+        SWIFT_VERSION: "5.0"
         TARGETED_DEVICE_FAMILY: "1,2"
         CODE_SIGNING_ALLOWED: NO
         CODE_SIGNING_REQUIRED: NO
@@ -37,3 +37,4 @@ targets:
         DEVELOPMENT_TEAM: ""
     scheme:
       gatherCoverageData: false
+
