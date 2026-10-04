@@ -112,7 +112,7 @@ final class VirtualScooterModel: ObservableObject {
 
 struct VirtualScooterView: View {
     @StateObject private var scooter = VirtualScooterModel()
-    @Environment(.dismiss) private var dismiss
+    @Environment(\\.dismiss) private var dismiss
 
     private let panel = Color(red: 0.075, green: 0.075, blue: 0.09)
 
