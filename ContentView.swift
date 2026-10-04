@@ -56,7 +56,7 @@ struct ContentView: View {
                 Text("X5Tune").font(.headline)
                 Text(ble.connectedPeripheral == nil ? "Not connected" : "Connected")
                     .font(.caption2)
-                    .foregroundStyle(ble.connectedPeripheral == nil ? .secondary : .green)
+                    .foregroundStyle(ble.connectedPeripheral == nil ? Color.secondary : Color.green)
             }
             Spacer()
             Text("READ ONLY").font(.caption2.bold()).foregroundStyle(.secondary)
@@ -599,7 +599,7 @@ struct CommandPalette: View {
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22))
         }
         .padding(14)
-        .background(.black.opacity(0.45).ignoresSafeArea())
+        .background(Color.black.opacity(0.45))
     }
 
     func paletteButton(_ title: String, _ action: @escaping () -> Void) -> some View {

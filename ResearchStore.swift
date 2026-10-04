@@ -54,7 +54,7 @@ final class ResearchStore: ObservableObject {
         let baselineUUIDs = Set(baselineEvents.map(\.uuid))
         let currentUUIDs = Set(current.map(\.uuid))
         let shared = baselineEvents.filter { baselineUUIDs.contains($0.uuid) && currentUUIDs.contains($0.uuid) }
-        let changedUUIDs = Set(current.compactMap { event in
+        let changedUUIDs = Set(current.compactMap { (event) -> String? in
             guard let old = baselineEvents.first(where: { $0.uuid == event.uuid }) else { return nil }
             guard let a = PacketAnalyzer.data(from: old.hex), let b = PacketAnalyzer.data(from: event.hex) else { return nil }
             return PacketAnalyzer.changed(a, b).isEmpty ? nil : event.uuid
