@@ -12,6 +12,7 @@ struct ContentView: View {
     @State private var experimentDescription = ""
     @State private var shareURL: URL?
     @State private var showShare = false
+    @State private var showSimulator = false
     @State private var replayIndex = 0
 
     private let bg = Color(red: 0.039, green: 0.039, blue: 0.047)
@@ -36,6 +37,7 @@ struct ContentView: View {
             .sheet(isPresented: $showShare) {
                 if let shareURL { ShareSheet(activityItems: [shareURL]) }
             }
+            .sheet(isPresented: $showSimulator) { VirtualScooterView() }
             if showPalette {
                 CommandPalette(show: $showPalette, tab: $tab) {
                     ble.startObservation("Quick capture")
@@ -95,6 +97,9 @@ struct ContentView: View {
                     }
                     HStack {
                         action("Experiment", "flask") { showExperiment = true }
+                        action("Virtual Scooter", "steeringwheel") { showSimulator = true }
+                    }
+                    HStack {
                         action("Export", "square.and.arrow.up") { exportSession() }
                         action("Scan", "antenna.radiowaves.left.and.right") { ble.isScanning ? ble.stopScan() : ble.scan() }
                     }
