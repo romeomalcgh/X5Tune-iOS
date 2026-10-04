@@ -1,4 +1,4 @@
-name: Build X5Tune unsigned IPA
+﻿name: Build X5Tune unsigned IPA
 
 on:
   workflow_dispatch:
@@ -45,6 +45,15 @@ jobs:
           zip -r ../X5Tune-unsigned.ipa Payload
           cd ..
           shasum -a 256 X5Tune-unsigned.ipa
+          echo "Validating IPA bundle contents..."
+          unzip -l X5Tune-unsigned.ipa
+          if unzip -l X5Tune-unsigned.ipa | grep -E "(^|/)\.git/|\.sample$|config\.worktree|hooks/" ; then
+            echo "ERROR: repository metadata leaked into the IPA"
+            exit 1
+          fi
+          test -n "$(unzip -Z1 X5Tune-unsigned.ipa | grep "^Payload/X5Tune.app/X5Tune$")"
+          test -n "$(unzip -Z1 X5Tune-unsigned.ipa | grep "^Payload/X5Tune.app/Info.plist$")"
+          echo "IPA structure validation passed."
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
@@ -52,3 +61,4 @@ jobs:
           name: X5Tune-unsigned-ipa
           path: X5Tune-unsigned.ipa
           if-no-files-found: error
+
