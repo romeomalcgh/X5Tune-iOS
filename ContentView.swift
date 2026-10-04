@@ -111,33 +111,75 @@ struct ContentView: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
 
-                Section("Packet analysis") {
+                Section("Packet analyzer") {
                     HStack {
                         Text("Events")
                         Spacer()
                         Text("\(ble.packetEvents.count)")
                     }
                     HStack {
-                        Text("Observed diffs")
+                        Text("Families")
                         Spacer()
-                        Text("\(ble.packetDiffs.count)")
+                        Text("\(ble.packetFamilies.count)")
                     }
-                    if let active = ble.activeObservation {
-                        Text("Active: \(active)").font(.caption).foregroundStyle(.secondary)
+                    HStack {
+                        Text("Changed pairs")
+                        Spacer()
+                        Text("\(ble.packetComparisons.count)")
                     }
-                    if !ble.packetDiffs.isEmpty {
-                        ForEach(Array(ble.packetDiffs.prefix(12))) { diff in
+                    HStack {
+                        Button("Analyze") { ble.analyzePackets() }.buttonStyle(.borderedProminent)
+                        Button("Compare") { ble.comparePackets() }.buttonStyle(.bordered)
+                    }
+                    if !ble.packetFamilies.isEmpty {
+                        Text("Packet families").font(.headline)
+                        ForEach(Array(ble.packetFamilies.prefix(10))) { family in
                             VStack(alignment: .leading, spacing: 3) {
-                                Text("\(diff.action) • \(diff.uuid)").font(.caption.bold())
-                                Text("Bytes changed: \(diff.changedBytes.map(String.init).joined(separator: ", "))").font(.caption2)
-                                Text("\(diff.before) → \(diff.after)")
-                                    .font(.system(.caption2, design: .monospaced))
-                                    .textSelection(.enabled)
+                                Text("\(family.uuid) • \(family.length) bytes • \(family.count)x").font(.caption.bold())
+                                Text("prefix \(family.prefix)").font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
                             }
                         }
-                    } else {
-                        Text("No packet differences recorded yet. Start an observation and perform one safe action.")
-                            .foregroundStyle(.secondary)
+                    }
+                    if !ble.fieldStats.isEmpty {
+                        Text("Stable byte offsets").font(.headline)
+                        ForEach(ble.fieldStats.filter { $0.sampleCount >= 3 && $0.stabilityPercent >= 80 }.prefix(16)) { field in
+                            Text("\(field.uuid) byte \(field.offset): \(String(format: "%.1f", field.stabilityPercent))% stable, \(field.distinctValues) distinct")
+                                .font(.caption2)
+                        }
+                    }
+                    if !ble.packetComparisons.isEmpty {
+                        Text("Historical byte changes").font(.headline)
+                        ForEach(Array(ble.packetComparisons.prefix(8))) { diff in
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("\(diff.uuid) • bytes \(diff.changedBytes.map(String.init).joined(separator: ", "))").font(.caption.bold())
+                                Text("\(diff.firstHex) → \(diff.secondHex)")
+                                    .font(.system(.caption2, design: .monospaced)).textSelection(.enabled)
+                            }
+                        }
+                    }
+                    if let active = ble.activeObservation {
+                        Text("Active observation: \(active)").font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+
+                Section("Live packet monitor") {
+                    Picker("Characteristic", selection: $ble.monitorUUID) {
+                        Text("All").tag("All")
+                        ForEach(ble.observedUUIDs, id: \.self) { uuid in Text(uuid).tag(uuid) }
+                    }
+                    TextField("Filter UUID, hex, or decoded text", text: $ble.monitorFilter)
+                        .textFieldStyle(.roundedBorder)
+                    ForEach(Array(ble.filteredPacketEvents.prefix(30))) { event in
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack {
+                                Text(event.uuid).font(.caption.bold())
+                                Spacer()
+                                Text(event.date, style: .time).font(.caption2).foregroundStyle(.secondary)
+                            }
+                            Text(event.hex).font(.system(.caption2, design: .monospaced)).textSelection(.enabled)
+                            if let text = event.text, !text.isEmpty { Text(text).font(.caption2) }
+                            if !event.changedBytes.isEmpty { Text("changed: \(event.changedBytes.map(String.init).joined(separator: ", "))").font(.caption2).foregroundStyle(.secondary) }
+                        }
                     }
                 }
 
@@ -272,6 +314,18 @@ struct ContentView: View {
                             ble.addLog("Report export failed: \(error.localizedDescription)")
                         }
                     }
+                    Button("Export full research session") {
+                        do {
+                            shareURL = try ble.exportSessionURL()
+                            showShare = true
+                        } catch {
+                            ble.addLog("Session export failed: \(error.localizedDescription)")
+                        }
+                    }
+                    if let saved = ble.sessionSavedAt {
+                        Text("Persistent session saved \(saved, style: .time)").font(.caption2).foregroundStyle(.secondary)
+                    }
+
                     Button("Create BLE snapshot") {
                         guard let snapshot = ble.exportSnapshot() else {
                             ble.addLog("Snapshot unavailable: no connected device")

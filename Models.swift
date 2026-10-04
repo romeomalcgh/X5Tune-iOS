@@ -53,6 +53,61 @@ struct PacketDiff: Identifiable, Codable {
     let changedBytes: [Int]
 }
 
+struct PacketComparison: Identifiable, Codable {
+    let id: UUID
+    let date: Date
+    let uuid: String
+    let firstEventID: UUID
+    let secondEventID: UUID
+    let changedBytes: [Int]
+    let firstHex: String
+    let secondHex: String
+}
+
+struct PacketFieldStat: Identifiable, Codable {
+    var id: String { "\(uuid):\(offset)" }
+    let uuid: String
+    let offset: Int
+    let sampleCount: Int
+    let distinctValues: Int
+    let stabilityPercent: Double
+    let minValue: UInt8
+    let maxValue: UInt8
+}
+
+struct PacketFamilySummary: Identifiable, Codable {
+    var id: String { "\(uuid):\(length):\(prefix)" }
+    let uuid: String
+    let length: Int
+    let prefix: String
+    let count: Int
+    let firstSeen: Date
+    let lastSeen: Date
+}
+
+struct PacketAnalysisSnapshot: Codable {
+    let generatedAt: Date
+    let familySummaries: [PacketFamilySummary]
+    let fieldStats: [PacketFieldStat]
+    let repeatedPackets: Int
+    let variablePackets: Int
+}
+
+struct ResearchSession: Codable {
+    let version: Int
+    let savedAt: Date
+    let deviceName: String
+    let deviceIdentifier: String
+    let boundary: String
+    let services: [ServiceSnapshot]
+    let markers: [ObservationMarker]
+    let packetEvents: [PacketEvent]
+    let diffs: [PacketDiff]
+    let comparisons: [PacketComparison]
+    let analysis: PacketAnalysisSnapshot
+    let notes: [String]
+}
+
 struct GuidedStep: Identifiable {
     let id: Int
     let title: String

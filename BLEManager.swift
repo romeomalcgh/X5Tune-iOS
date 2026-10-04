@@ -15,6 +15,12 @@ final class BLEManager: NSObject, ObservableObject {
     @Published var isScanning = false
     @Published var activeObservation: String?
     @Published var selectedProfile: ResearchTestProfile = .brake
+    @Published var packetComparisons: [PacketComparison] = []
+    @Published var packetFamilies: [PacketFamilySummary] = []
+    @Published var fieldStats: [PacketFieldStat] = []
+    @Published var monitorFilter = ""
+    @Published var monitorUUID = "All"
+    @Published var sessionSavedAt: Date?
 
     private var central: CBCentralManager!
     private var characteristicMap: [CBUUID: CBCharacteristic] = [:]
@@ -24,6 +30,7 @@ final class BLEManager: NSObject, ObservableObject {
     override init() {
         super.init()
         central = CBCentralManager(delegate: self, queue: nil)
+        restoreLastSession()
     }
 
     func scan() {
@@ -92,6 +99,7 @@ final class BLEManager: NSObject, ObservableObject {
         addLog("OBSERVATION END: \(name)")
         activeObservation = nil
         observationBaselines.removeAll()
+        persistSession()
     }
 
     func recordGuideAction(_ label: String) {
@@ -107,6 +115,10 @@ final class BLEManager: NSObject, ObservableObject {
         packetEvents.removeAll()
         observationMarkers.removeAll()
         packetDiffs.removeAll()
+        packetComparisons.removeAll()
+        packetFamilies.removeAll()
+        fieldStats.removeAll()
+        UserDefaults.standard.removeObject(forKey: "X5Tune.ResearchSession.v2")
         latestValues.removeAll()
         observationBaselines.removeAll()
         activeObservation = nil
@@ -172,6 +184,95 @@ final class BLEManager: NSObject, ObservableObject {
 
     func copyableLog() -> String { copyableReport() }
 
+    var filteredPacketEvents: [PacketEvent] {
+        packetEvents.filter {
+            (monitorUUID == "All" || $0.uuid == monitorUUID) &&
+            (monitorFilter.isEmpty || $0.hex.localizedCaseInsensitiveContains(monitorFilter) || $0.uuid.localizedCaseInsensitiveContains(monitorFilter) || ($0.text?.localizedCaseInsensitiveContains(monitorFilter) ?? false))
+        }
+    }
+
+    var observedUUIDs: [String] { Array(Set(packetEvents.map(\.uuid))).sorted() }
+
+    func comparePackets() {
+        packetComparisons = []
+        let ordered = Array(packetEvents.reversed())
+        guard ordered.count > 1 else { addLog("Comparison needs at least two packets"); return }
+        for i in 1..<ordered.count {
+            let a = ordered[i - 1], b = ordered[i]
+            guard a.uuid == b.uuid, let da = PacketAnalyzer.data(from: a.hex), let db = PacketAnalyzer.data(from: b.hex) else { continue }
+            let changes = PacketAnalyzer.changed(da, db)
+            if !changes.isEmpty {
+                packetComparisons.append(PacketComparison(id: UUID(), date: b.date, uuid: b.uuid, firstEventID: a.id, secondEventID: b.id, changedBytes: changes, firstHex: a.hex, secondHex: b.hex))
+            }
+        }
+        if packetComparisons.count > 1000 { packetComparisons = Array(packetComparisons.prefix(1000)) }
+        addLog("Historical comparison complete: \(packetComparisons.count) changed packet pairs")
+        persistSession()
+    }
+
+    func analyzePackets() {
+        packetFamilies = buildFamilies()
+        fieldStats = buildFieldStats()
+        addLog("Analyzer refreshed: \(packetFamilies.count) packet families, \(fieldStats.count) byte offsets")
+        persistSession()
+    }
+
+    private func buildFamilies() -> [PacketFamilySummary] {
+        var map: [String: PacketFamilySummary] = [:]
+        for event in packetEvents.reversed() {
+            guard let data = PacketAnalyzer.data(from: event.hex) else { continue }
+            let prefix = data.prefix(3).map { String(format: "%02X", $0) }.joined(separator: " ")
+            let key = "\(event.uuid):\(data.count):\(prefix)"
+            if let old = map[key] {
+                map[key] = PacketFamilySummary(uuid: old.uuid, length: old.length, prefix: old.prefix, count: old.count + 1, firstSeen: old.firstSeen, lastSeen: event.date)
+            } else {
+                map[key] = PacketFamilySummary(uuid: event.uuid, length: data.count, prefix: prefix, count: 1, firstSeen: event.date, lastSeen: event.date)
+            }
+        }
+        return map.values.sorted { ($0.uuid, $0.length, $0.prefix) < ($1.uuid, $1.length, $1.prefix) }
+    }
+
+    private func buildFieldStats() -> [PacketFieldStat] {
+        struct Acc { var count = 0; var values = Set<UInt8>(); var min: UInt8 = 255; var max: UInt8 = 0 }
+        var map: [String: Acc] = [:]
+        for event in packetEvents {
+            guard let data = PacketAnalyzer.data(from: event.hex) else { continue }
+            for offset in data.indices {
+                let key = "\(event.uuid):\(offset)"
+                var a = map[key] ?? Acc()
+                a.count += 1; a.values.insert(data[offset]); a.min = Swift.min(a.min, data[offset]); a.max = Swift.max(a.max, data[offset])
+                map[key] = a
+            }
+        }
+        return map.compactMap { key, a in
+            let parts = key.split(separator: ":")
+            guard parts.count == 2, let offset = Int(parts[1]) else { return nil }
+            let stability = Double(a.count - a.values.count + 1) / Double(a.count) * 100
+            return PacketFieldStat(uuid: String(parts[0]), offset: offset, sampleCount: a.count, distinctValues: a.values.count, stabilityPercent: stability, minValue: a.min, maxValue: a.max)
+        }.sorted { ($0.uuid, $0.offset) < ($1.uuid, $1.offset) }
+    }
+
+    func exportSessionURL() throws -> URL {
+        let session = ResearchSession(version: 2, savedAt: Date(), deviceName: connectedPeripheral?.name ?? "Unknown", deviceIdentifier: connectedPeripheral?.identifier.uuidString ?? "n/a", boundary: "READ/NOTIFY ONLY — no BLE writes exposed.", services: snapshots, markers: observationMarkers, packetEvents: packetEvents, diffs: packetDiffs, comparisons: packetComparisons, analysis: PacketAnalysisSnapshot(generatedAt: Date(), familySummaries: packetFamilies, fieldStats: fieldStats, repeatedPackets: 0, variablePackets: packetComparisons.count), notes: ["Observational research only."])
+        let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]; encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(session)
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("X5Tune-Research-Session-\(Int(Date().timeIntervalSince1970)).json")
+        try data.write(to: url); addLog("Full research session exported"); return url
+    }
+
+    private func persistSession() {
+        let session = ResearchSession(version: 2, savedAt: Date(), deviceName: connectedPeripheral?.name ?? "Unknown", deviceIdentifier: connectedPeripheral?.identifier.uuidString ?? "n/a", boundary: "READ/NOTIFY ONLY — no BLE writes exposed.", services: snapshots, markers: observationMarkers, packetEvents: packetEvents, diffs: packetDiffs, comparisons: packetComparisons, analysis: PacketAnalysisSnapshot(generatedAt: Date(), familySummaries: packetFamilies, fieldStats: fieldStats, repeatedPackets: 0, variablePackets: packetComparisons.count), notes: ["Observational research only."])
+        let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601
+        if let data = try? encoder.encode(session) { UserDefaults.standard.set(data, forKey: "X5Tune.ResearchSession.v2"); sessionSavedAt = session.savedAt }
+    }
+
+    private func restoreLastSession() {
+        guard let data = UserDefaults.standard.data(forKey: "X5Tune.ResearchSession.v2") else { return }
+        let decoder = JSONDecoder(); decoder.dateDecodingStrategy = .iso8601
+        guard let session = try? decoder.decode(ResearchSession.self, from: data) else { return }
+        snapshots = session.services; observationMarkers = session.markers; packetEvents = session.packetEvents; packetDiffs = session.diffs; packetComparisons = session.comparisons; packetFamilies = session.analysis.familySummaries; fieldStats = session.analysis.fieldStats; sessionSavedAt = session.savedAt
+    }
+
     func addLog(_ message: String) {
         log.insert(LogEntry(message: message), at: 0)
         if log.count > 1000 { log.removeLast() }
@@ -227,7 +328,11 @@ final class BLEManager: NSObject, ObservableObject {
                 addLog("DIFF \(observation) / \(uuid): bytes \(diff.map(String.init).joined(separator: ",")) changed")
             }
         }
+        packetFamilies = buildFamilies()
+        fieldStats = buildFieldStats()
+        persistSession()
     }
+
 }
 
 extension BLEManager: CBCentralManagerDelegate {
