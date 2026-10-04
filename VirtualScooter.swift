@@ -737,7 +737,7 @@ struct VirtualScooterView: View {
         .font(.caption)
     }
 
-    private func evidenceRow(_ title: String, _ value: String, _ evidence: Evidence) -> some View {
+    private func evidenceRow(_ title: String, _ value: String, _ evidence: VirtualScooterModel.Evidence) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack {
                 Text(title)
