@@ -14,7 +14,6 @@ final class BLEManager: NSObject, ObservableObject {
     private var characteristicMap: [CBUUID: CBCharacteristic] = [:]
 
     override init() { super.init(); central = CBCentralManager(delegate: self, queue: nil) }
-
     func scan() {
         guard bluetoothState == .poweredOn else { addLog("Bluetooth is not ready"); return }
         peripherals.removeAll(); isScanning = true
@@ -29,24 +28,20 @@ final class BLEManager: NSObject, ObservableObject {
     func disconnect() { if let p = connectedPeripheral { central.cancelPeripheralConnection(p) } }
     func setNotify(_ enabled: Bool, for uuid: String) {
         guard let characteristic = characteristicMap[CBUUID(string: uuid)], let peripheral = connectedPeripheral else {
-            addLog("Notify \(uuid): unavailable (not connected or not discovered)")
-            return
+            addLog("Notify \(uuid): unavailable (not connected or not discovered)"); return
         }
         guard characteristic.properties.contains(.notify) || characteristic.properties.contains(.indicate) else {
-            addLog("Notify \(uuid): unsupported")
-            return
+            addLog("Notify \(uuid): unsupported"); return
         }
         addLog("\(enabled ? "Subscribing" : "Unsubscribing") \(uuid)…")
         peripheral.setNotifyValue(enabled, for: characteristic)
     }
     func read(_ uuid: String) {
         guard let characteristic = characteristicMap[CBUUID(string: uuid)], let peripheral = connectedPeripheral else {
-            addLog("Read \(uuid): unavailable (not connected or not discovered)")
-            return
+            addLog("Read \(uuid): unavailable (not connected or not discovered)"); return
         }
         guard characteristic.properties.contains(.read) else { addLog("Read \(uuid): unsupported"); return }
-        addLog("Reading \(uuid)…")
-        peripheral.readValue(for: characteristic)
+        addLog("Reading \(uuid)…"); peripheral.readValue(for: characteristic)
     }
     func exportSnapshot() -> BLESnapshot? {
         guard let p = connectedPeripheral else { return nil }
@@ -54,9 +49,23 @@ final class BLEManager: NSObject, ObservableObject {
         addLog("Snapshot prepared. BLE/GATT data only, not firmware/NVM.")
         return snapshot
     }
+    func copyableLog() -> String {
+        let formatter = ISO8601DateFormatter()
+        var lines = [
+            "X5Tune research log",
+            "Device: \(connectedPeripheral?.name ?? "No connected device")",
+            "Identifier: \(connectedPeripheral?.identifier.uuidString ?? "n/a")",
+            "Generated: \(formatter.string(from: Date()))",
+            "Boundary: READ/NOTIFY ONLY; no BLE write operations are exposed.",
+            "",
+            "=== LOG ==="
+        ]
+        lines += log.reversed().map { "[\(formatter.string(from: $0.date))] \($0.message)" }
+        return lines.joined(separator: "\n")
+    }
     func addLog(_ message: String) {
         log.insert(LogEntry(message: message), at: 0)
-        if log.count > 300 { log.removeLast() }
+        if log.count > 500 { log.removeLast() }
     }
     private func rebuildSnapshots() {
         snapshots = services.map { s in
@@ -100,13 +109,11 @@ extension BLEManager: CBCentralManagerDelegate {
         Task { @MainActor in self.addLog("Disconnected\(error.map { ": \($0.localizedDescription)" } ?? "")"); self.connectedPeripheral=nil }
     }
 }
-
 extension BLEManager: CBPeripheralDelegate {
     nonisolated func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error:Error?) {
         Task { @MainActor in
             if let error { self.addLog("Service discovery error: \(error.localizedDescription)"); return }
-            self.services = peripheral.services ?? []
-            self.addLog("Discovered \(self.services.count) services")
+            self.services = peripheral.services ?? []; self.addLog("Discovered \(self.services.count) services")
             for s in self.services { peripheral.discoverCharacteristics(nil, for:s) }
         }
     }
