@@ -8,26 +8,22 @@ struct CharacteristicSnapshot: Codable, Identifiable {
     var valueUTF8: String?
     var isNotifying: Bool
 }
-
 struct ServiceSnapshot: Codable, Identifiable {
     let id: String
     let uuid: String
     var characteristics: [CharacteristicSnapshot]
 }
-
 struct BLESnapshot: Codable {
     let createdAt: Date
     let peripheralName: String
     let peripheralIdentifier: String
     let services: [ServiceSnapshot]
 }
-
 struct LogEntry: Identifiable {
     let id = UUID()
     let date = Date()
     let message: String
 }
-
 struct PacketEvent: Identifiable, Codable {
     let id: UUID
     let date: Date
@@ -36,13 +32,11 @@ struct PacketEvent: Identifiable, Codable {
     let text: String?
     let changedBytes: [Int]
 }
-
 struct ObservationMarker: Identifiable, Codable {
     let id: UUID
     let date: Date
     let label: String
 }
-
 struct PacketDiff: Identifiable, Codable {
     let id: UUID
     let date: Date
@@ -52,7 +46,6 @@ struct PacketDiff: Identifiable, Codable {
     let after: String
     let changedBytes: [Int]
 }
-
 struct PacketComparison: Identifiable, Codable {
     let id: UUID
     let date: Date
@@ -63,7 +56,6 @@ struct PacketComparison: Identifiable, Codable {
     let firstHex: String
     let secondHex: String
 }
-
 struct PacketFieldStat: Identifiable, Codable {
     var id: String { "\(uuid):\(offset)" }
     let uuid: String
@@ -74,7 +66,6 @@ struct PacketFieldStat: Identifiable, Codable {
     let minValue: UInt8
     let maxValue: UInt8
 }
-
 struct PacketFamilySummary: Identifiable, Codable {
     var id: String { "\(uuid):\(length):\(prefix)" }
     let uuid: String
@@ -84,7 +75,6 @@ struct PacketFamilySummary: Identifiable, Codable {
     let firstSeen: Date
     let lastSeen: Date
 }
-
 struct PacketAnalysisSnapshot: Codable {
     let generatedAt: Date
     let familySummaries: [PacketFamilySummary]
@@ -92,7 +82,6 @@ struct PacketAnalysisSnapshot: Codable {
     let repeatedPackets: Int
     let variablePackets: Int
 }
-
 struct ResearchSession: Codable {
     let version: Int
     let savedAt: Date
@@ -107,7 +96,6 @@ struct ResearchSession: Codable {
     let analysis: PacketAnalysisSnapshot
     let notes: [String]
 }
-
 struct GuidedStep: Identifiable {
     let id: Int
     let title: String
@@ -115,65 +103,35 @@ struct GuidedStep: Identifiable {
     let safety: String
     let marker: String
 }
-
 enum ResearchTestProfile: String, CaseIterable, Identifiable {
-    case brake = "Brake telemetry"
-    case power = "Power-state telemetry"
-    case lights = "Lights telemetry"
-    case lock = "Lock-state telemetry"
-    case battery = "Battery telemetry"
-    case charging = "Charging-state telemetry"
-    case baseline = "Passive baseline"
-
+    case brake = "Brake telemetry", power = "Power-state telemetry", lights = "Lights telemetry", lock = "Lock-state telemetry", battery = "Battery telemetry", charging = "Charging-state telemetry", baseline = "Passive baseline"
     var id: String { rawValue }
-
     var instruction: String {
         switch self {
-        case .brake: return "Stationary: observe the scooter before, during, and after normal brake-lever use."
-        case .power: return "Stationary: observe the normal power button and wait for telemetry to settle."
-        case .lights: return "Stationary: observe normal light controls without riding."
-        case .lock: return "Stationary: observe only the scooter's normal lock/unlock behavior."
-        case .battery: return "Observe battery telemetry without changing scooter settings."
-        case .charging: return "With the scooter stationary, observe normal charging-state telemetry only."
-        case .baseline: return "Collect passive notifications for a stable baseline before another test."
+        case .brake: return "Stationary: observe before, during and after normal brake use."
+        case .power: return "Stationary: observe the normal power control and wait for telemetry to settle."
+        case .lights: return "Stationary: observe normal light controls."
+        case .lock: return "Stationary: observe normal lock/unlock behavior only."
+        case .battery: return "Observe battery telemetry without changing settings."
+        case .charging: return "Observe normal charging-state telemetry only."
+        case .baseline: return "Collect passive notifications for a stable baseline."
         }
     }
-
-    var safety: String {
-        switch self {
-        case .brake: return "Do not ride or accelerate."
-        case .power: return "Do not enter reset, update, or pairing flows."
-        case .lights: return "Keep the scooter stationary."
-        case .lock: return "Do not attempt to bypass the lock."
-        case .battery: return "Read-only observation."
-        case .charging: return "Use only the normal charger and normal charging procedure."
-        case .baseline: return "No controls need to be touched."
-        }
-    }
+    var safety: String { "Read/notify only. Do not ride or bypass safety controls." }
 }
-
 enum ResearchScenario: String, CaseIterable, Identifiable {
-    case zeroStart = "Zero-start"
-    case speedLimit = "Speed limit"
-    case acceleration = "Acceleration curve"
-    case region = "Region profile"
-
+    case zeroStart = "Zero-start", speedLimit = "Speed limit", acceleration = "Acceleration curve", region = "Region profile"
     var id: String { rawValue }
-
     var summary: String {
         switch self {
-        case .zeroStart: return "Hypothetical study of how a controller might distinguish a stationary throttle command from a moving-start condition."
-        case .speedLimit: return "Hypothetical study of a configured speed ceiling. No controller value is read, changed, or bypassed."
-        case .acceleration: return "Hypothetical study of how an acceleration curve could be represented by a controller."
-        case .region: return "Hypothetical study of region/profile-dependent configuration without changing the scooter."
+        case .zeroStart: return "Hypothetical representation only. No controller setting is read or changed."
+        case .speedLimit: return "Hypothetical ceiling model only. No limit is modified."
+        case .acceleration: return "Hypothetical acceleration model only."
+        case .region: return "Hypothetical region/profile model only."
         }
     }
-
-    var boundary: String {
-        "SIMULATION ONLY — X5Tune exposes no BLE write operation and cannot enable, remove, raise, or bypass this setting."
-    }
+    var boundary: String { "SIMULATION ONLY — X5Tune exposes no BLE write operation." }
 }
-
 struct ResearchReport: Codable {
     let generatedAt: Date
     let deviceName: String
@@ -184,4 +142,65 @@ struct ResearchReport: Codable {
     let packetEvents: [PacketEvent]
     let diffs: [PacketDiff]
     let notes: [String]
+}
+enum ResearchConfidence: String, CaseIterable, Codable {
+    case observed = "Observed"
+    case correlated = "Correlated"
+    case likely = "Likely"
+    case confirmed = "Confirmed"
+}
+struct ResearchNote: Identifiable, Codable {
+    let id: UUID
+    var date: Date
+    var title: String
+    var body: String
+    var confidence: ResearchConfidence
+}
+struct Experiment: Identifiable, Codable {
+    let id: UUID
+    var name: String
+    var description: String
+    var startedAt: Date
+    var endedAt: Date?
+    var eventIDs: [UUID]
+    var confidence: ResearchConfidence
+}
+struct ReplayFrame: Identifiable {
+    let id: UUID
+    let event: PacketEvent
+    let index: Int
+}
+struct NumericInterpretation: Identifiable {
+    let id = UUID()
+    let label: String
+    let value: String
+}
+struct PacketInsight: Identifiable {
+    let id = UUID()
+    let title: String
+    let detail: String
+    let confidence: ResearchConfidence
+}
+struct ChecksumCandidate: Identifiable {
+    let id = UUID()
+    let name: String
+    let offset: Int
+    let matchPercent: Double
+}
+struct SequenceCandidate: Identifiable {
+    let id = UUID()
+    let uuid: String
+    let offset: Int
+    let matchPercent: Double
+}
+
+struct SessionComparison: Identifiable {
+    let id = UUID()
+    let baselineCount: Int
+    let currentCount: Int
+    let sharedCount: Int
+    let addedCount: Int
+    let removedCount: Int
+    let changedCount: Int
+    let changedUUIDs: [String]
 }
