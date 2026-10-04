@@ -49,22 +49,25 @@ final class ResearchStore: ObservableObject {
     }
 
     func compareCurrent(_ current: [PacketEvent]) {
-        let baselineMap = Dictionary(grouping: baselineEvents, by: { "\($0.uuid)|\($0.hex)" })
-        let currentMap = Dictionary(grouping: current, by: { "\($0.uuid)|\($0.hex)" })
-        let baselineUUIDs = Set(baselineEvents.map(\.uuid))
-        let currentUUIDs = Set(current.map(\.uuid))
-        let shared = baselineEvents.filter { baselineUUIDs.contains($0.uuid) && currentUUIDs.contains($0.uuid) }
-        let changedUUIDs = Set(current.compactMap { (event) -> String? in
-            guard let old = baselineEvents.first(where: { $0.uuid == event.uuid }) else { return nil }
-            guard let a = PacketAnalyzer.data(from: old.hex), let b = PacketAnalyzer.data(from: event.hex) else { return nil }
-            return PacketAnalyzer.changed(a, b).isEmpty ? nil : event.uuid
-        }).sorted()
+        let baselineByUUID = Dictionary(grouping: baselineEvents, by: \.uuid)
+        let currentByUUID = Dictionary(grouping: current, by: \.uuid)
+
+        let baselineUUIDs = Set(baselineByUUID.keys)
+        let currentUUIDs = Set(currentByUUID.keys)
+        let sharedUUIDs = baselineUUIDs.intersection(currentUUIDs)
+
+        let changedUUIDs = sharedUUIDs.filter { uuid in
+            let baselinePayloads = Set(baselineByUUID[uuid, default: []].map(\.hex))
+            let currentPayloads = Set(currentByUUID[uuid, default: []].map(\.hex))
+            return baselinePayloads != currentPayloads
+        }.sorted()
+
         lastComparison = SessionComparison(
             baselineCount: baselineEvents.count,
             currentCount: current.count,
-            sharedCount: shared.count,
-            addedCount: max(0, currentMap.count - baselineMap.count),
-            removedCount: max(0, baselineMap.count - currentMap.count),
+            sharedCount: sharedUUIDs.count,
+            addedCount: currentUUIDs.subtracting(baselineUUIDs).count,
+            removedCount: baselineUUIDs.subtracting(currentUUIDs).count,
             changedCount: changedUUIDs.count,
             changedUUIDs: changedUUIDs
         )

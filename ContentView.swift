@@ -6,7 +6,6 @@ struct ContentView: View {
     @StateObject private var store = ResearchStore()
     @State private var tab = 0
     @State private var selectedEvent: PacketEvent?
-    @State private var showPalette = false
     @State private var showExperiment = false
     @State private var experimentName = ""
     @State private var experimentDescription = ""
@@ -15,35 +14,34 @@ struct ContentView: View {
     @State private var showSimulator = false
     @State private var replayIndex = 0
 
-    private let bg = Color(red: 0.039, green: 0.039, blue: 0.047)
-    private let panel = Color(red: 0.075, green: 0.075, blue: 0.09)
-    private let accent = Color.blue
 
     var body: some View {
-        ZStack {
-            bg.ignoresSafeArea()
-            TabView(selection: $tab) {
-                NavigationStack { dashboard }.tabItem { Label("Home", systemImage: "bolt.fill") }.tag(0)
-                NavigationStack { monitor }.tabItem { Label("Monitor", systemImage: "waveform.path.ecg") }.tag(1)
-                NavigationStack { sessions }.tabItem { Label("Sessions", systemImage: "clock.arrow.circlepath") }.tag(2)
-                NavigationStack { analysis }.tabItem { Label("Analysis", systemImage: "chart.bar.xaxis") }.tag(3)
-                NavigationStack { device }.tabItem { Label("Device", systemImage: "dot.radiowaves.left.and.right") }.tag(4)
-            }
-            .tint(accent)
-            .toolbarBackground(bg, for: .tabBar)
-            .toolbarBackground(.visible, for: .tabBar)
-            .sheet(item: $selectedEvent) { PacketInspector(event: $0) }
-            .sheet(isPresented: $showExperiment) { experimentSheet }
-            .sheet(isPresented: $showShare) {
-                if let shareURL { ShareSheet(activityItems: [shareURL]) }
-            }
-            .sheet(isPresented: $showSimulator) { VirtualScooterView() }
-            if showPalette {
-                CommandPalette(show: $showPalette, tab: $tab) {
-                    ble.startObservation("Quick capture")
-                }
+        TabView(selection: $tab) {
+            NavigationStack { dashboard }
+                .tabItem { Label("Home", systemImage: "bolt.fill") }
+                .tag(0)
+            NavigationStack { monitor }
+                .tabItem { Label("Monitor", systemImage: "waveform.path.ecg") }
+                .tag(1)
+            NavigationStack { sessions }
+                .tabItem { Label("Sessions", systemImage: "clock.arrow.circlepath") }
+                .tag(2)
+            NavigationStack { analysis }
+                .tabItem { Label("Analysis", systemImage: "chart.bar.xaxis") }
+                .tag(3)
+            NavigationStack { device }
+                .tabItem { Label("Device", systemImage: "dot.radiowaves.left.and.right") }
+                .tag(4)
+        }
+        .tint(.blue)
+        .sheet(item: $selectedEvent) { PacketInspector(event: $0) }
+        .sheet(isPresented: $showExperiment) { experimentSheet }
+        .sheet(isPresented: $showShare) {
+            if let shareURL {
+                ShareSheet(activityItems: [shareURL])
             }
         }
+        .sheet(isPresented: $showSimulator) { VirtualScooterView() }
         .preferredColorScheme(.dark)
         .onAppear {
             store.load()
@@ -51,161 +49,179 @@ struct ContentView: View {
         }
     }
 
-    var header: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "bolt.fill").font(.title2).foregroundStyle(accent)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("X5Tune").font(.headline)
-                Text(ble.connectedPeripheral == nil ? "Not connected" : "Connected")
-                    .font(.caption2)
-                    .foregroundStyle(ble.connectedPeripheral == nil ? Color.secondary : Color.green)
-            }
-            Spacer()
-            Text("READ ONLY").font(.caption2.bold()).foregroundStyle(.secondary)
-            Button { showPalette = true } label: { Image(systemName: "command") }
-        }
-    }
-
     var dashboard: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                header
-                VStack(alignment: .leading, spacing: 10) {
-                    Text(ble.connectedPeripheral?.name ?? "Xiaomi Electric Scooter 5 Plus").font(.title2.bold())
-                    Text(ble.connectedPeripheral?.identifier.uuidString ?? "Connect a scooter to begin research")
-                        .font(.caption2).foregroundStyle(.secondary).textSelection(.enabled)
-                    HStack {
-                        Circle().fill(ble.bluetoothState == .poweredOn ? .green : .orange).frame(width: 8, height: 8)
-                        Text(ble.bluetoothState == .poweredOn ? "Bluetooth ready" : "Bluetooth unavailable")
-                        Spacer()
-                    }
-                    Divider()
-                    HStack {
-                        metric("Packets", "\(ble.packetEvents.count)")
-                        metric("Families", "\(ble.packetFamilies.count)")
-                        metric("Changed", "\(ble.packetComparisons.count)")
-                    }
+        List {
+            Section("Scooter") {
+                LabeledContent("Device", value: ble.connectedPeripheral?.name ?? "Not connected")
+                if let peripheral = ble.connectedPeripheral {
+                    Text(peripheral.identifier.uuidString)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
                 }
-                .padding(16).background(panel, in: RoundedRectangle(cornerRadius: 20))
+                HStack {
+                    Circle()
+                        .fill(ble.bluetoothState == .poweredOn ? .green : .orange)
+                        .frame(width: 8, height: 8)
+                    Text(ble.bluetoothState == .poweredOn ? "Bluetooth ready" : "Bluetooth unavailable")
+                }
+                .font(.subheadline)
+            }
 
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Quick actions").font(.headline)
-                    HStack {
-                        action("Capture", "record.circle.fill") { ble.startObservation("Quick capture") }
-                        action("Analyze", "sparkles") { ble.analyzePackets() }
-                        action("Compare", "arrow.left.arrow.right") { ble.comparePackets() }
-                    }
-                    HStack {
-                        action("Experiment", "flask") { showExperiment = true }
-                        action("Virtual Scooter", "steeringwheel") { showSimulator = true }
-                    }
-                    HStack {
-                        action("Export", "square.and.arrow.up") { exportSession() }
-                        action("Scan", "antenna.radiowaves.left.and.right") { ble.isScanning ? ble.stopScan() : ble.scan() }
-                    }
+            Section("Research") {
+                LabeledContent("Packets", value: "\(ble.packetEvents.count)")
+                LabeledContent("Packet families", value: "\(ble.packetFamilies.count)")
+                LabeledContent("Changed comparisons", value: "\(ble.packetComparisons.count)")
+                LabeledContent("Characteristics", value: "\(ble.snapshots.flatMap { $0.characteristics }.count)")
+                LabeledContent("Session saved", value: ble.sessionSavedAt?.formatted(date: .omitted, time: .shortened) ?? "Not yet")
+                LabeledContent("Confidence", value: "Observational")
+                if let active = ble.activeObservation {
+                    LabeledContent("Active observation", value: active)
+                }
+            }
+
+            Section("Actions") {
+                Button {
+                    ble.isScanning ? ble.stopScan() : ble.scan()
+                } label: {
+                    Label(ble.isScanning ? "Stop scanning" : "Scan for scooter", systemImage: "antenna.radiowaves.left.and.right")
                 }
 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Research").font(.headline)
-                    infoRow("Characteristics", "\(ble.snapshots.flatMap { $0.characteristics }.count)")
-                    infoRow("Saved", ble.sessionSavedAt?.formatted(date: .omitted, time: .shortened) ?? "Not yet")
-                    if let active = ble.activeObservation { infoRow("Active", active) }
-                    infoRow("Confidence", "Observational")
+                Button {
+                    ble.startObservation("Quick capture")
+                    tab = 1
+                } label: {
+                    Label("Start capture", systemImage: "record.circle")
                 }
-                .padding(14).background(panel, in: RoundedRectangle(cornerRadius: 16))
+                .disabled(ble.connectedPeripheral == nil)
 
-                if !ble.packetEvents.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Recent packets").font(.headline)
-                        ForEach(Array(ble.packetEvents.prefix(5))) { event in
-                            Button { selectedEvent = event } label: {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    HStack {
-                                        Text(event.uuid).font(.caption.bold())
-                                        Spacer()
-                                        Text(event.date, style: .time).font(.caption2).foregroundStyle(.secondary)
-                                    }
-                                    Text(event.hex).font(.system(.caption2, design: .monospaced)).lineLimit(1).foregroundStyle(.secondary)
+                Button {
+                    ble.analyzePackets()
+                    tab = 3
+                } label: {
+                    Label("Analyze packets", systemImage: "chart.bar.xaxis")
+                }
+
+                Button {
+                    ble.comparePackets()
+                    tab = 3
+                } label: {
+                    Label("Compare adjacent packets", systemImage: "arrow.left.arrow.right")
+                }
+                .disabled(ble.packetEvents.count < 2)
+
+                Button {
+                    showExperiment = true
+                } label: {
+                    Label("New experiment", systemImage: "flask")
+                }
+                .disabled(ble.connectedPeripheral == nil)
+
+                Button {
+                    showSimulator = true
+                } label: {
+                    Label("Open simulator", systemImage: "figure.outdoor.cycle")
+                }
+
+                Button {
+                    exportSession()
+                } label: {
+                    Label("Export research session", systemImage: "square.and.arrow.up")
+                }
+                .disabled(ble.connectedPeripheral == nil)
+            }
+
+            Section("Recent packets") {
+                if ble.packetEvents.isEmpty {
+                    Text("No packets captured yet.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(Array(ble.packetEvents.prefix(5))) { event in
+                        Button {
+                            selectedEvent = event
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(event.uuid)
+                                        .font(.caption.monospaced().bold())
+                                    Text(event.hex)
+                                        .font(.caption2.monospaced())
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
                                 }
-                                .padding(10).background(panel, in: RoundedRectangle(cornerRadius: 12))
+                                Spacer()
+                                Text(event.date, style: .time)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
                             }
-                            .buttonStyle(.plain)
                         }
                     }
                 }
             }
-            .padding(16)
-        }
-        .navigationTitle("Dashboard")
-        .navigationBarTitleDisplayMode(.inline)
-    }
 
-    func metric(_ title: String, _ value: String) -> some View {
-        VStack(alignment: .leading) {
-            Text(value).font(.title3.bold())
-            Text(title).font(.caption).foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    func infoRow(_ title: String, _ value: String) -> some View {
-        HStack { Text(title); Spacer(); Text(value).foregroundStyle(.secondary) }
-            .font(.subheadline)
-    }
-
-    func action(_ title: String, _ icon: String, _ tap: @escaping () -> Void) -> some View {
-        Button(action: tap) {
-            VStack(spacing: 7) {
-                Image(systemName: icon).font(.title3)
-                Text(title).font(.caption.bold())
+            Section("Safety") {
+                Text("READ / NOTIFY ONLY")
+                    .font(.headline)
+                Text("X5Tune does not expose BLE writes, firmware updates, controller parameter writes, speed-limit changes, region changes, reset/write flows, or bypass controls.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(panel, in: RoundedRectangle(cornerRadius: 14))
         }
+        .navigationTitle("Home")
     }
 
     var monitor: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
+        List {
+            Section("Filter") {
                 Picker("Characteristic", selection: $ble.monitorUUID) {
                     Text("All").tag("All")
                     ForEach(ble.observedUUIDs, id: \.self) { Text($0).tag($0) }
                 }
-                .pickerStyle(.menu)
 
                 TextField("Search characteristic, hex or text", text: $ble.monitorFilter)
-                    .textFieldStyle(.roundedBorder)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
 
-                HStack {
-                    Text("\(ble.filteredPacketEvents.count) packets").font(.caption)
-                    Spacer()
-                    Button("Clear") { ble.monitorFilter = "" }.font(.caption)
-                }
-
-                ForEach(Array(ble.filteredPacketEvents.prefix(200))) { event in
-                    Button { selectedEvent = event } label: {
-                        VStack(alignment: .leading, spacing: 5) {
-                            HStack {
-                                Text(event.uuid).font(.caption.bold())
-                                Spacer()
-                                Text(event.date, style: .time).font(.caption2).foregroundStyle(.secondary)
-                            }
-                            Text(event.hex).font(.system(.caption, design: .monospaced)).lineLimit(2)
-                            if !event.changedBytes.isEmpty {
-                                Text("Changed: \(event.changedBytes.map(String.init).joined(separator: ", "))")
-                                    .font(.caption2).foregroundStyle(.secondary)
-                            }
-                        }
-                        .padding(12).background(panel, in: RoundedRectangle(cornerRadius: 14))
-                    }
-                    .buttonStyle(.plain)
+                LabeledContent("Matching packets", value: "\(ble.filteredPacketEvents.count)")
+                if !ble.monitorFilter.isEmpty {
+                    Button("Clear search") { ble.monitorFilter = "" }
                 }
             }
-            .padding(16)
+
+            Section("Packets") {
+                if ble.filteredPacketEvents.isEmpty {
+                    Text("No packets match the current filter.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(Array(ble.filteredPacketEvents.prefix(200))) { event in
+                        Button {
+                            selectedEvent = event
+                        } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Text(event.uuid)
+                                        .font(.caption.monospaced().bold())
+                                    Spacer()
+                                    Text(event.date, style: .time)
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Text(event.hex)
+                                    .font(.caption.monospaced())
+                                    .lineLimit(2)
+                                    .foregroundStyle(.secondary)
+                                if !event.changedBytes.isEmpty {
+                                    Text("Changed: \(event.changedBytes.map(String.init).joined(separator: ", "))")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
         .navigationTitle("Monitor")
-        .navigationBarTitleDisplayMode(.inline)
     }
 
     var sessions: some View {
@@ -355,7 +371,7 @@ struct ContentView: View {
                         ForEach(PacketAnalyzer.bitRows(data.first ?? 0), id: \.0) { bit in
                             VStack {
                                 Text("\(bit.0)").font(.caption2)
-                                Circle().fill(bit.1 ? accent : .gray).frame(width: 10, height: 10)
+                                Circle().fill(bit.1 ? .blue : .gray).frame(width: 10, height: 10)
                             }
                             .frame(maxWidth: .infinity)
                         }
@@ -576,44 +592,6 @@ struct PacketInspector: View {
             .navigationTitle("Packet")
             .navigationBarTitleDisplayMode(.inline)
         }
-    }
-}
-
-struct CommandPalette: View {
-    @Binding var show: Bool
-    @Binding var tab: Int
-    let startCapture: () -> Void
-
-    var body: some View {
-        VStack {
-            Spacer()
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text("Quick actions").font(.headline)
-                    Spacer()
-                    Button("Close") { show = false }
-                }
-                paletteButton("Dashboard") { tab = 0 }
-                paletteButton("Live monitor") { tab = 1 }
-                paletteButton("Sessions") { tab = 2 }
-                paletteButton("Analysis") { tab = 3 }
-                paletteButton("Device") { tab = 4 }
-                paletteButton("Start capture") { startCapture(); tab = 1 }
-            }
-            .padding(18)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22))
-        }
-        .padding(14)
-        .background(Color.black.opacity(0.45))
-    }
-
-    func paletteButton(_ title: String, _ action: @escaping () -> Void) -> some View {
-        Button(title) {
-            action()
-            show = false
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
     }
 }
 

@@ -14,7 +14,6 @@ final class BLEManager: NSObject, ObservableObject {
     @Published var packetDiffs: [PacketDiff] = []
     @Published var isScanning = false
     @Published var activeObservation: String?
-    @Published var selectedProfile: ResearchTestProfile = .brake
     @Published var packetComparisons: [PacketComparison] = []
     @Published var packetFamilies: [PacketFamilySummary] = []
     @Published var fieldStats: [PacketFieldStat] = []
@@ -124,28 +123,6 @@ final class BLEManager: NSObject, ObservableObject {
         activeObservation = nil
         log.removeAll()
         addLog("Research session cleared")
-    }
-
-    func exportSnapshot() -> BLESnapshot? {
-        guard let p = connectedPeripheral else { return nil }
-        let snapshot = BLESnapshot(createdAt: Date(), peripheralName: p.name ?? "Unnamed", peripheralIdentifier: p.identifier.uuidString, services: snapshots)
-        addLog("Snapshot prepared. BLE/GATT data only, not firmware/NVM.")
-        return snapshot
-    }
-
-    func researchReport() -> ResearchReport? {
-        guard let p = connectedPeripheral else { return nil }
-        return ResearchReport(
-            generatedAt: Date(),
-            deviceName: p.name ?? "Unnamed",
-            deviceIdentifier: p.identifier.uuidString,
-            boundary: "READ/NOTIFY ONLY. X5Tune does not expose BLE writes, firmware updates, controller parameter changes, speed-limit bypass, or zero-start enablement.",
-            services: snapshots,
-            markers: observationMarkers,
-            packetEvents: packetEvents,
-            diffs: packetDiffs,
-            notes: ["Interpret packet meaning from repeated observations; a packet change is not proof of causality."]
-        )
     }
 
     func copyableReport() -> String {

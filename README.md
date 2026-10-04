@@ -10,7 +10,6 @@ It can scan/connect, enumerate GATT services and characteristics, read readable 
 
 ## Research features
 
-- Guided step-by-step physical observation workflow.
 - Safe stationary test profiles for brake, power, lights, lock state, battery, charging state, and passive baselines.
 - Timestamped observation markers.
 - Raw RX packet capture.
@@ -19,7 +18,7 @@ It can scan/connect, enumerate GATT services and characteristics, read readable 
 - Per-characteristic research notes/knowledge base.
 - Theoretical simulator for zero-start, speed limit, acceleration curve, and region profile concepts. Simulator values are display-only and cannot reach the scooter.
 - Copyable research report designed to be pasted into ChatGPT.
-- JSON research-report and BLE snapshot export.
+- JSON research-session, CSV packet, and HTML report export.
 
 ## Current known observation
 

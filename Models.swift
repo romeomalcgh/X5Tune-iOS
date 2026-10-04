@@ -13,12 +13,6 @@ struct ServiceSnapshot: Codable, Identifiable {
     let uuid: String
     var characteristics: [CharacteristicSnapshot]
 }
-struct BLESnapshot: Codable {
-    let createdAt: Date
-    let peripheralName: String
-    let peripheralIdentifier: String
-    let services: [ServiceSnapshot]
-}
 struct LogEntry: Identifiable {
     let id = UUID()
     let date = Date()
@@ -96,53 +90,6 @@ struct ResearchSession: Codable {
     let analysis: PacketAnalysisSnapshot
     let notes: [String]
 }
-struct GuidedStep: Identifiable {
-    let id: Int
-    let title: String
-    let instruction: String
-    let safety: String
-    let marker: String
-}
-enum ResearchTestProfile: String, CaseIterable, Identifiable {
-    case brake = "Brake telemetry", power = "Power-state telemetry", lights = "Lights telemetry", lock = "Lock-state telemetry", battery = "Battery telemetry", charging = "Charging-state telemetry", baseline = "Passive baseline"
-    var id: String { rawValue }
-    var instruction: String {
-        switch self {
-        case .brake: return "Stationary: observe before, during and after normal brake use."
-        case .power: return "Stationary: observe the normal power control and wait for telemetry to settle."
-        case .lights: return "Stationary: observe normal light controls."
-        case .lock: return "Stationary: observe normal lock/unlock behavior only."
-        case .battery: return "Observe battery telemetry without changing settings."
-        case .charging: return "Observe normal charging-state telemetry only."
-        case .baseline: return "Collect passive notifications for a stable baseline."
-        }
-    }
-    var safety: String { "Read/notify only. Do not ride or bypass safety controls." }
-}
-enum ResearchScenario: String, CaseIterable, Identifiable {
-    case zeroStart = "Zero-start", speedLimit = "Speed limit", acceleration = "Acceleration curve", region = "Region profile"
-    var id: String { rawValue }
-    var summary: String {
-        switch self {
-        case .zeroStart: return "Hypothetical representation only. No controller setting is read or changed."
-        case .speedLimit: return "Hypothetical ceiling model only. No limit is modified."
-        case .acceleration: return "Hypothetical acceleration model only."
-        case .region: return "Hypothetical region/profile model only."
-        }
-    }
-    var boundary: String { "SIMULATION ONLY — X5Tune exposes no BLE write operation." }
-}
-struct ResearchReport: Codable {
-    let generatedAt: Date
-    let deviceName: String
-    let deviceIdentifier: String
-    let boundary: String
-    let services: [ServiceSnapshot]
-    let markers: [ObservationMarker]
-    let packetEvents: [PacketEvent]
-    let diffs: [PacketDiff]
-    let notes: [String]
-}
 enum ResearchConfidence: String, CaseIterable, Codable {
     case observed = "Observed"
     case correlated = "Correlated"
@@ -164,11 +111,6 @@ struct Experiment: Identifiable, Codable {
     var endedAt: Date?
     var eventIDs: [UUID]
     var confidence: ResearchConfidence
-}
-struct ReplayFrame: Identifiable {
-    let id: UUID
-    let event: PacketEvent
-    let index: Int
 }
 struct NumericInterpretation: Identifiable {
     let id = UUID()

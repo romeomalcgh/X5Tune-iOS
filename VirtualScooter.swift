@@ -47,47 +47,24 @@ final class VirtualScooterModel: ObservableObject {
         case strongCandidate = "Strong candidate"
         case inferred = "Inferred"
         case unknown = "Unknown"
-
-        var color: Color {
-            switch self {
-            case .confirmed: return .green
-            case .observed: return .blue
-            case .strongCandidate: return .orange
-            case .inferred: return .yellow
-            case .unknown: return .gray
-            }
-        }
     }
 
     struct Calibration: Identifiable {
         let id = UUID()
         var riderMassKg = 75.0
         var scooterMassKg = 26.6
-        var wheelRadiusM = 0.152
-        var motorRatedW = 400.0
         var motorPeakW = 900.0
         var batteryNominalV = 46.8
         var batteryCapacityWh = 477.36
         var rollingCoefficient = 0.012
         var aeroCoefficient = 0.55
         var drivetrainEfficiency = 0.86
-        var controllerResponse = 2.4
         var thermalGain = 0.020
         var thermalCooling = 0.035
         var gradePercent = 0.0
         var windKmh = 0.0
 
         var totalMassKg: Double { riderMassKg + scooterMassKg }
-    }
-
-    struct Profile: Identifiable {
-        let id = UUID()
-        var name: String
-        var mode: RideMode
-        var speedCap: Double
-        var accelerationScale: Double
-        var throttleCurve: Double
-        var regenStrength: Double
     }
 
     struct TestResult: Identifiable {
@@ -106,13 +83,6 @@ final class VirtualScooterModel: ObservableObject {
         let app = "2.7.0_0039"
         let mcu = "0035"
         let hardware = "SZMC-ES-02664"
-        let mcuSHA256 = "bdcec9c57c53279a19c28e437003e06e11f441170a349f94f7fdb140edd33cf4"
-        let knownScale = 17.4
-        let driveReference = 348.0
-        let sportReference = 435.0
-        let modeRAMCandidate = "0x20001E2C"
-        let modeCandidateEvidence: Evidence = .strongCandidate
-        let physicalSemanticsEvidence: Evidence = .unknown
     }
 
     let firmwareBasis = FirmwareBasis()
@@ -151,19 +121,9 @@ final class VirtualScooterModel: ObservableObject {
     private var distanceKm = 0.0
     private var energyWh = 0.0
 
-    var firmware = "APP 2.7.0_0039"
-    var mcu = "MCU 0035"
-    var bms = "012"
-    var hardware = "SZMC-ES-02664"
-
     var targetSpeed: Double {
         min(experimentalSpeedCap, region.modeSpeeds[mode] ?? region.regulatoryReferenceSpeed)
     }
-
-    var massKg: Double { riderMassKg + 26.6 }
-
-    var distanceMeters: Double { distanceKm * 1000 }
-    var energyUsedWh: Double { energyWh }
 
     deinit { timer?.invalidate() }
 
@@ -185,8 +145,8 @@ final class VirtualScooterModel: ObservableObject {
 
     func reset() {
         speed = 0
-        battery = 82
-        batteryVoltage = 49
+        battery = 100
+        batteryVoltage = 46.8
         currentAmps = 0
         motorTemperature = 24
         controllerTemperature = 24
@@ -215,37 +175,14 @@ final class VirtualScooterModel: ObservableObject {
         brake = false
     }
 
-    func applyProfile(_ profile: Profile) {
-        mode = profile.mode
-        experimentalSpeedCap = profile.speedCap
-        accelerationScale = profile.accelerationScale
-        throttleCurve = profile.throttleCurve
-        regenStrength = profile.regenStrength
-    }
-
-    func stockProfile(for mode: RideMode? = nil) -> Profile {
-        let selected = mode ?? self.mode
-        let cap = region.modeSpeeds[selected] ?? region.regulatoryReferenceSpeed
-        let acceleration: Double
-        switch selected {
-        case .pedestrian: acceleration = 0.45
-        case .eco: acceleration = 0.68
-        case .drive: acceleration = 0.88
-        case .sport: acceleration = 1.0
-        }
-        return Profile(name: "Stock (selected.rawValue)", mode: selected,
-                       speedCap: cap, accelerationScale: acceleration,
-                       throttleCurve: 1.0, regenStrength: 0.35)
-    }
-
     func runStandardTests() {
         let saved = snapshotParameters()
         var results: [TestResult] = []
         let tests: [(String, Double)] = [
-            ("0 â†’ 5 km/h", 5),
-            ("0 â†’ 10 km/h", 10),
-            ("0 â†’ 15 km/h", 15),
-            ("15 â†’ 20 km/h", 20)
+            ("0 -> 5 km/h", 5),
+            ("0 -> 10 km/h", 10),
+            ("0 -> 15 km/h", 15),
+            ("15 -> 20 km/h", 20)
         ]
 
         for (name, target) in tests {
@@ -265,7 +202,16 @@ final class VirtualScooterModel: ObservableObject {
         setThrottle(1)
         gradePercent = 10
         let hillDuration = simulateUntil(speedTarget: 10, timeout: 45)
-        results.append(makeResult(name: "10% hill â†’ 10 km/h", duration: hillDuration, target: 10))
+        results.append(makeResult(name: "10% hill → 10 km/h", duration: hillDuration, target: 10))
+
+        reset()
+        mode = .drive
+        experimentalSpeedCap = region.regulatoryReferenceSpeed
+        zeroStart = true
+        speed = 15
+        setThrottle(1)
+        let rollingDuration = simulateUntil(speedTarget: 20, timeout: 45)
+        results.append(makeResult(name: "15 → 20 km/h", duration: rollingDuration, target: 20))
 
         reset()
         mode = .drive
@@ -274,7 +220,7 @@ final class VirtualScooterModel: ObservableObject {
         setThrottle(1)
         riderMassKg = 110
         let heavyDuration = simulateUntil(speedTarget: 15, timeout: 45)
-        results.append(makeResult(name: "Heavy rider â†’ 15 km/h", duration: heavyDuration, target: 15))
+        results.append(makeResult(name: "Heavy rider -> 15 km/h", duration: heavyDuration, target: 15))
 
         restoreParameters(saved)
         lastTestResults = results
@@ -369,8 +315,7 @@ final class VirtualScooterModel: ObservableObject {
         let aerodynamicForce = 0.5 * 1.225 * calibration.aeroCoefficient * relativeSpeed * relativeSpeed
         let resistance = rollingForce + gradeForce + aerodynamicForce
 
-        let peakForce = calibration.motorPeakW / max(speedMps, 2.0)
-        let availableForce = min(peakForce, calibration.motorPeakW / max(speedMps, 2.0))
+        let availableForce = calibration.motorPeakW / max(speedMps, 2.0)
         let commandedForce = availableForce * shapedThrottle * accelerationScale * calibration.drivetrainEfficiency
 
         let controllerCapForce = speed >= cap ? -max(0, (speed - cap) * 8.0) : 0
@@ -391,12 +336,14 @@ final class VirtualScooterModel: ObservableObject {
 
         let wheelPowerW = max(0, commandedForce * max(speedMps, 0))
         let regenW = regenForce * max(speedMps, 0)
-        currentAmps = max(0, (wheelPowerW - regenW) / max(batteryVoltage, 1))
-        energyWh += max(0, wheelPowerW - regenW) * dt / 3600.0
+        let auxiliaryPowerW = lights ? 12.0 : 0.0
+        let batteryPowerW = max(0, wheelPowerW - regenW) + auxiliaryPowerW
+        currentAmps = batteryPowerW / max(batteryVoltage, 1)
+        energyWh += batteryPowerW * dt / 3600.0
         distanceKm += speed * dt / 3600.0
 
         let batteryEnergyFraction = min(1, energyWh / max(calibration.batteryCapacityWh, 1))
-        battery = max(0, 82 - batteryEnergyFraction * 100)
+        battery = max(0, 100 - batteryEnergyFraction * 100)
         let sag = min(5.0, currentAmps * 0.045)
         batteryVoltage = max(38, calibration.batteryNominalV - sag - batteryEnergyFraction * 3.0)
 
@@ -441,7 +388,7 @@ struct VirtualScooterView: View {
                             Spacer()
                             Label(String(format: "%.1f A", scooter.currentAmps), systemImage: "bolt.fill")
                             Spacer()
-                            Label(String(format: "%.0fÂ°C", scooter.motorTemperature), systemImage: "thermometer.medium")
+                            Label(String(format: "%.0f C", scooter.motorTemperature), systemImage: "thermometer.medium")
                         }
                         .font(.caption).foregroundStyle(.secondary)
                     }
@@ -512,7 +459,7 @@ struct VirtualScooterView: View {
                                         .font(.caption.weight(.semibold))
                                         .foregroundStyle(result.reachedTarget ? .green : .orange)
                                 }
-                                Text(String(format: "%.2fs â€¢ %.1f km/h â€¢ %.1f Wh â€¢ %.0fÂ°C",
+                                Text(String(format: "%.2fs | %.1f km/h | %.1f Wh | %.0f C",
                                             result.duration, result.finalSpeed, result.energyWh, result.peakMotorTemperature))
                                     .font(.caption).foregroundStyle(.secondary)
                             }

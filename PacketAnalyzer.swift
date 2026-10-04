@@ -21,16 +21,6 @@ enum PacketAnalyzer {
             return av != bv
         }
     }
-    static func commonPrefix(_ a: Data, _ b: Data) -> Int {
-        var n = 0
-        while n < min(a.count,b.count) && a[n] == b[n] { n += 1 }
-        return n
-    }
-    static func commonSuffix(_ a: Data, _ b: Data) -> Int {
-        var n = 0
-        while n < min(a.count,b.count) && a[a.count-1-n] == b[b.count-1-n] { n += 1 }
-        return n
-    }
     static func interpretations(_ data: Data) -> [NumericInterpretation] {
         var out: [NumericInterpretation] = []
         let bytes = Array(data)
@@ -41,10 +31,13 @@ enum PacketAnalyzer {
             out.append(NumericInterpretation(label: "UInt\(width*8) LE", value: String(le())))
             out.append(NumericInterpretation(label: "UInt\(width*8) BE", value: String(be())))
             if width > 1 {
-                let lv = Int64(bitPattern: le() | (width == 2 ? 0xFFFFFFFFFFFF0000 : width == 4 ? 0xFFFFFFFF00000000 : 0))
-                let bv = Int64(bitPattern: be() | (width == 2 ? 0xFFFFFFFFFFFF0000 : width == 4 ? 0xFFFFFFFF00000000 : 0))
-                out.append(NumericInterpretation(label: "Int\(width*8) LE", value: String(lv)))
-                out.append(NumericInterpretation(label: "Int\(width*8) BE", value: String(bv)))
+                let signBit = UInt64(1) << UInt64(width * 8 - 1)
+                let leValue = le()
+                let beValue = be()
+                let leSigned = Int64(bitPattern: (leValue & signBit) != 0 ? leValue | (UInt64.max << UInt64(width * 8)) : leValue)
+                let beSigned = Int64(bitPattern: (beValue & signBit) != 0 ? beValue | (UInt64.max << UInt64(width * 8)) : beValue)
+                out.append(NumericInterpretation(label: "Int\(width*8) LE", value: String(leSigned)))
+                out.append(NumericInterpretation(label: "Int\(width*8) BE", value: String(beSigned)))
             }
         }
         if bytes.count >= 4 {
